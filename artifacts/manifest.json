@@ -1,0 +1,27 @@
+{
+  "pipeline_version": "1.0.0",
+  "created_at": "2026-09-11T10:01:02Z",
+  "sources": {
+    "gene_info": {
+      "path": "data/raw/gene_info/genes_function_info.json",
+      "sha256": "f4a4872052a85c3e51378d55bf7a04d25d4c046b8eb53e8bb31b864e722f6338",
+      "raw_records": 24825
+    },
+    "ldsc_2hrI": {
+      "path": "data/raw/ldsc/genetic_correlation/2hrl/2hrI.json",
+      "sha256": "3a1c173c9c223f0dd9896e6219276a04570ba6e43fb45f4acb01d1ddad6a2506",
+      "raw_rows": 1646
+    },
+    "paths_config": "config/paths.yaml"
+  },
+  "outputs": {
+    "gene_info.chunks.jsonl": {
+      "path": "artifacts/chunks/gene_info.chunks.jsonl",
+      "chunks": 24825
+    },
+    "ldsc_2hrI.chunks.jsonl": {
+      "path": "artifacts/chunks/ldsc_2hrI.chunks.jsonl",
+      "chunks": 781
+    }
+  }
+}

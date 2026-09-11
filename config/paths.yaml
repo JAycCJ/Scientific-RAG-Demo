@@ -1,0 +1,16 @@
+# Single source of truth for pipeline paths (loaded by src/chunking/paths.py)
+# Paths relative to project_root
+project_root: "."
+
+raw:
+  gene_info: "data/raw/gene_info/genes_function_info.json"
+  ldsc_2hri: "data/raw/ldsc/genetic_correlation/2hrl/2hrI.json"
+
+artifacts:
+  chunks_dir: "artifacts/chunks"
+  manifest: "artifacts/manifest.json"
+
+config:
+  phenotype_glossary: "config/phenotype_glossary.json"
+
+pipeline_version: "1.0.0"

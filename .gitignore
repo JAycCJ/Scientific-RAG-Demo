@@ -1,0 +1,13 @@
+
+# IDE / local docs
+.idea/
+docs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment
+.env
+.venv/

@@ -1,0 +1,46 @@
+{
+  "2hrI": {
+    "label": "2-hour insulin (OGTT)",
+    "category": "quantitative_trait"
+  },
+  "2hrG": {
+    "label": "2-hour glucose (OGTT)",
+    "category": "quantitative_trait"
+  },
+  "2hrGadjBMI": {
+    "label": "2-hour glucose adjusted for BMI",
+    "category": "quantitative_trait"
+  },
+  "2hrFFA": {
+    "label": "2-hour free fatty acids (OGTT)",
+    "category": "quantitative_trait"
+  },
+  "T2D": {
+    "label": "Type 2 Diabetes",
+    "category": "disease"
+  },
+  "BMI": {
+    "label": "Body Mass Index",
+    "category": "quantitative_trait"
+  },
+  "AD": {
+    "label": "Alzheimer's Disease",
+    "category": "disease"
+  },
+  "Asthma": {
+    "label": "Asthma",
+    "category": "disease"
+  },
+  "AF": {
+    "label": "Atrial Fibrillation",
+    "category": "disease"
+  },
+  "ALT": {
+    "label": "Alanine aminotransferase",
+    "category": "quantitative_trait"
+  },
+  "AnyCVD": {
+    "label": "Any cardiovascular disease",
+    "category": "disease"
+  }
+}
