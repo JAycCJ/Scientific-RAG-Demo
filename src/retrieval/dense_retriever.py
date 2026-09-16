@@ -50,6 +50,56 @@ class MockEncoder:
         return self._encode(texts)
 
 
+_WEIGHT_FILENAMES = (
+    "model.safetensors",
+    "model.safetensors.index.json",
+    "pytorch_model.bin",
+)
+
+
+def embedding_model_is_cached(model_name: str, cache_dir: str | Path | None = None) -> bool:
+    from huggingface_hub import try_to_load_from_cache
+
+    kwargs: dict[str, Any] = {}
+    if cache_dir is not None:
+        kwargs["cache_dir"] = str(cache_dir)
+    config_path = try_to_load_from_cache(repo_id=model_name, filename="config.json", **kwargs)
+    if not isinstance(config_path, str):
+        return False
+    return any(
+        isinstance(
+            try_to_load_from_cache(repo_id=model_name, filename=name, **kwargs),
+            str,
+        )
+        for name in _WEIGHT_FILENAMES
+    )
+
+
+def ensure_embedding_model_downloaded(model_name: str, cache_dir: str | Path | None = None) -> Path:
+    from huggingface_hub import snapshot_download
+    from huggingface_hub.constants import HF_HUB_CACHE
+
+    cache = str(cache_dir) if cache_dir is not None else HF_HUB_CACHE
+    if embedding_model_is_cached(model_name, cache):
+        print(f"本地已有 embedding 模型: {model_name}", flush=True)
+        print(f"Hugging Face model cache: {cache}", flush=True)
+        return Path(cache)
+
+    print(
+        f"本机未找到 {model_name}，开始自动下载到 {cache}（约 1GB+，需联网）。",
+        flush=True,
+    )
+    print("下载进度见下方进度条。可设置 HF_TOKEN 以提高 Hugging Face 限额。", flush=True)
+    try:
+        snapshot_path = snapshot_download(repo_id=model_name, cache_dir=cache)
+    except Exception as exc:
+        raise RuntimeError(
+            f"下载 {model_name} 失败，请检查网络或设置 HF_TOKEN 后重试。原因: {exc}"
+        ) from exc
+    print(f"模型下载完成: {snapshot_path}", flush=True)
+    return Path(snapshot_path)
+
+
 class SentenceTransformerEncoder:
     def __init__(
         self,
@@ -63,7 +113,6 @@ class SentenceTransformerEncoder:
             # and abort with 0xc0000374 unless pandas is already loaded.
             import pandas  # noqa: F401
             import torch
-            from huggingface_hub.constants import HF_HUB_CACHE
             from sentence_transformers import SentenceTransformer
         except ModuleNotFoundError as exc:
             missing = getattr(exc, "name", None) or "torch/sentence-transformers"
@@ -79,8 +128,8 @@ class SentenceTransformerEncoder:
         self.model_name = model_name
         self.device = device
         self.dimension = dimension
+        ensure_embedding_model_downloaded(model_name)
         print(f"Loading embedding model {model_name} on {device}...", flush=True)
-        print(f"Hugging Face model cache: {HF_HUB_CACHE}", flush=True)
         self.model = SentenceTransformer(model_name, device=device)
         self.model.max_seq_length = max_seq_length
         self.revision = str(
