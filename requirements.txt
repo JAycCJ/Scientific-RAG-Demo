@@ -9,6 +9,13 @@
 #   pip install -e ".[embed]"
 
 PyYAML>=6.0.1
+numpy>=1.24.0
+bm25s>=0.2.0
+faiss-cpu>=1.8.0
+sentence-transformers>=2.7.0
+# Windows + NVIDIA GPU: install CUDA torch separately, not the CPU wheel from PyPI:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+torch>=2.1.0
 
 # ---------------------------------------------------------------------------
 # Stage 2: Embedding & hybrid retrieval (BGE-M3)
@@ -17,7 +24,6 @@ PyYAML>=6.0.1
 # FlagEmbedding>=1.2.11
 # sentence-transformers>=2.7.0
 # torch>=2.1.0
-# numpy>=1.24.0
 
 # ---------------------------------------------------------------------------
 # Stage 3: API / evaluation (optional, add when implemented)
