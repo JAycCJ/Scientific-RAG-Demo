@@ -13,6 +13,7 @@ from retrieval.corpus import LoadedCorpus
 from retrieval.dense_retriever import (
     MockEncoder,
     build_dense_index,
+    embedding_model_is_cached,
     load_dense_index,
     save_dense_index,
 )
@@ -70,6 +71,9 @@ class DenseRetrieverTests(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertEqual(loaded.faiss_index.ntotal, 3)
         self.assertEqual(loaded.faiss_index.d, 8)
+
+    def test_unknown_hub_repo_is_not_cached(self) -> None:
+        self.assertFalse(embedding_model_is_cached("cs46-test/missing-embedding-model"))
 
 
 if __name__ == "__main__":
