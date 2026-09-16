@@ -11,3 +11,7 @@ __pycache__/
 # Environment
 .env
 .venv/
+
+# Retrieval artifacts
+artifacts/evaluation/
+artifacts/indexes/
