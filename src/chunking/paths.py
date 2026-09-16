@@ -11,6 +11,9 @@ class ProjectPaths:
     project_root: Path
     gene_file: Path
     ldsc_file: Path
+    gene_id_map_file: Path
+    gene_association_common_2hrg_file: Path
+    gene_association_rare_2hrg_file: Path
     glossary_file: Path
     chunks_dir: Path
     manifest_file: Path
@@ -50,6 +53,13 @@ def load_paths(
         project_root=resolved_root,
         gene_file=_resolve(resolved_root, raw["gene_info"]),
         ldsc_file=_resolve(resolved_root, raw["ldsc_2hri"]),
+        gene_id_map_file=_resolve(resolved_root, raw["gene_id_map"]),
+        gene_association_common_2hrg_file=_resolve(
+            resolved_root, raw["gene_association_common_2hrg"]
+        ),
+        gene_association_rare_2hrg_file=_resolve(
+            resolved_root, raw["gene_association_rare_2hrg"]
+        ),
         glossary_file=_resolve(resolved_root, config["phenotype_glossary"]),
         chunks_dir=_resolve(resolved_root, artifacts["chunks_dir"]),
         manifest_file=_resolve(resolved_root, artifacts["manifest"]),
