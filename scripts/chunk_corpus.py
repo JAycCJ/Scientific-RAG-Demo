@@ -12,6 +12,10 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from chunking.gene_association_chunker import (
+    chunk_gene_association_common,
+    chunk_gene_association_rare,
+)
 from chunking.gene_chunker import chunk_genes
 from chunking.ldsc_chunker import chunk_ldsc_pairs
 from chunking.paths import load_paths
@@ -96,20 +100,42 @@ def main() -> int:
     ldsc_chunks = list(maybe_limit(ldsc_iter, args.dry_run))
     ldsc_raw_rows = getattr(chunk_ldsc_pairs, "raw_row_count", None)
 
+    gassoc_common_iter = chunk_gene_association_common(
+        paths.gene_association_common_2hrg_file,
+        glossary,
+        paths.project_root,
+    )
+    gassoc_common_chunks = list(maybe_limit(gassoc_common_iter, args.dry_run))
+    gassoc_common_raw_rows = getattr(chunk_gene_association_common, "raw_row_count", None)
+
+    gassoc_rare_iter = chunk_gene_association_rare(
+        paths.gene_association_rare_2hrg_file,
+        glossary,
+        paths.project_root,
+    )
+    gassoc_rare_chunks = list(maybe_limit(gassoc_rare_iter, args.dry_run))
+    gassoc_rare_raw_rows = getattr(chunk_gene_association_rare, "raw_row_count", None)
+
     if ldsc_raw_rows is None and args.dry_run == 0:
         ldsc_raw_rows = sum(len(item.metadata["results"]) for item in ldsc_chunks)
 
     gene_records = [chunk.to_dict() for chunk in gene_chunks]
     ldsc_records = [chunk.to_dict() for chunk in ldsc_chunks]
+    gassoc_common_records = [chunk.to_dict() for chunk in gassoc_common_chunks]
+    gassoc_rare_records = [chunk.to_dict() for chunk in gassoc_rare_chunks]
 
-    validate_chunk_records(gene_records)
-    validate_chunk_records(ldsc_records)
+    all_records = gene_records + ldsc_records + gassoc_common_records + gassoc_rare_records
+    validate_chunk_records(all_records)
 
     gene_output = paths.chunks_dir / "gene_info.chunks.jsonl"
     ldsc_output = paths.chunks_dir / "ldsc_2hrI.chunks.jsonl"
+    gassoc_common_output = paths.chunks_dir / "gene_association_common_2hrG.chunks.jsonl"
+    gassoc_rare_output = paths.chunks_dir / "gene_association_rare_2hrG.chunks.jsonl"
 
     gene_count = write_jsonl(gene_output, iter(gene_records))
     ldsc_count = write_jsonl(ldsc_output, iter(ldsc_records))
+    gassoc_common_count = write_jsonl(gassoc_common_output, iter(gassoc_common_records))
+    gassoc_rare_count = write_jsonl(gassoc_rare_output, iter(gassoc_rare_records))
 
     manifest = ChunkManifest(
         pipeline_version=paths.pipeline_version,
@@ -125,6 +151,26 @@ def main() -> int:
                 "sha256": file_sha256(paths.ldsc_file),
                 "raw_rows": ldsc_raw_rows,
             },
+            "gene_id_map": {
+                "path": paths.gene_id_map_file.relative_to(paths.project_root).as_posix(),
+                "sha256": file_sha256(paths.gene_id_map_file),
+                "chunked": False,
+                "note": "Reference lookup only; not embedded in RAG index",
+            },
+            "gene_association_common_2hrG": {
+                "path": paths.gene_association_common_2hrg_file.relative_to(
+                    paths.project_root
+                ).as_posix(),
+                "sha256": file_sha256(paths.gene_association_common_2hrg_file),
+                "raw_rows": gassoc_common_raw_rows,
+            },
+            "gene_association_rare_2hrG": {
+                "path": paths.gene_association_rare_2hrg_file.relative_to(
+                    paths.project_root
+                ).as_posix(),
+                "sha256": file_sha256(paths.gene_association_rare_2hrg_file),
+                "raw_rows": gassoc_rare_raw_rows,
+            },
             "paths_config": paths.config_file.relative_to(paths.project_root).as_posix(),
         },
         outputs={
@@ -136,6 +182,14 @@ def main() -> int:
                 "path": ldsc_output.relative_to(paths.project_root).as_posix(),
                 "chunks": ldsc_count,
             },
+            "gene_association_common_2hrG.chunks.jsonl": {
+                "path": gassoc_common_output.relative_to(paths.project_root).as_posix(),
+                "chunks": gassoc_common_count,
+            },
+            "gene_association_rare_2hrG.chunks.jsonl": {
+                "path": gassoc_rare_output.relative_to(paths.project_root).as_posix(),
+                "chunks": gassoc_rare_count,
+            },
         },
     )
 
@@ -146,6 +200,8 @@ def main() -> int:
     print(f"Using paths config: {paths.config_file}")
     print(f"Wrote {gene_count} gene chunks -> {gene_output}")
     print(f"Wrote {ldsc_count} LDSC chunks -> {ldsc_output}")
+    print(f"Wrote {gassoc_common_count} common association chunks -> {gassoc_common_output}")
+    print(f"Wrote {gassoc_rare_count} rare association chunks -> {gassoc_rare_output}")
     print(f"Wrote manifest -> {paths.manifest_file}")
     return 0
 

@@ -4,7 +4,10 @@ project_root: "."
 
 raw:
   gene_info: "data/raw/gene_info/genes_function_info.json"
-  ldsc_2hri: "data/raw/ldsc/genetic_correlation/2hrl/2hrI.json"
+  ldsc_2hri: "data/raw/ldsc/genetic_correlation/2hrI/2hrI.json"
+  gene_id_map: "data/raw/reference/gene_id_map/genes.jsonl"
+  gene_association_common_2hrg: "data/raw/gene_association/common/2hrG/2hrG.common.jsonl"
+  gene_association_rare_2hrg: "data/raw/gene_association/rare/2hrG/2hrG.rare.jsonl"
 
 artifacts:
   chunks_dir: "artifacts/chunks"
@@ -13,4 +16,4 @@ artifacts:
 config:
   phenotype_glossary: "config/phenotype_glossary.json"
 
-pipeline_version: "1.0.0"
+pipeline_version: "1.1.0"
