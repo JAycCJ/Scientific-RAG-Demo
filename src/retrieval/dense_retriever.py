@@ -81,22 +81,27 @@ def ensure_embedding_model_downloaded(model_name: str, cache_dir: str | Path | N
 
     cache = str(cache_dir) if cache_dir is not None else HF_HUB_CACHE
     if embedding_model_is_cached(model_name, cache):
-        print(f"本地已有 embedding 模型: {model_name}", flush=True)
+        print(f"Embedding model already cached locally: {model_name}", flush=True)
         print(f"Hugging Face model cache: {cache}", flush=True)
         return Path(cache)
 
     print(
-        f"本机未找到 {model_name}，开始自动下载到 {cache}（约 1GB+，需联网）。",
+        f"Embedding model {model_name} not found locally. "
+        f"Downloading to {cache} (~1GB+, network required).",
         flush=True,
     )
-    print("下载进度见下方进度条。可设置 HF_TOKEN 以提高 Hugging Face 限额。", flush=True)
+    print(
+        "See the progress bar below. Set HF_TOKEN for higher Hugging Face rate limits.",
+        flush=True,
+    )
     try:
         snapshot_path = snapshot_download(repo_id=model_name, cache_dir=cache)
     except Exception as exc:
         raise RuntimeError(
-            f"下载 {model_name} 失败，请检查网络或设置 HF_TOKEN 后重试。原因: {exc}"
+            f"Failed to download {model_name}. Check network or set HF_TOKEN and retry. "
+            f"Reason: {exc}"
         ) from exc
-    print(f"模型下载完成: {snapshot_path}", flush=True)
+    print(f"Model download complete: {snapshot_path}", flush=True)
     return Path(snapshot_path)
 
 
@@ -117,7 +122,7 @@ class SentenceTransformerEncoder:
         except ModuleNotFoundError as exc:
             missing = getattr(exc, "name", None) or "torch/sentence-transformers"
             raise ModuleNotFoundError(
-                f"缺少 {missing}。GPU 安装示例: "
+                f"Missing {missing}. For GPU, install with: "
                 "pip install torch --index-url https://download.pytorch.org/whl/cu126 && "
                 "pip install sentence-transformers"
             ) from exc
