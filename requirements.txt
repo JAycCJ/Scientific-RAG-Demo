@@ -10,6 +10,7 @@
 
 PyYAML>=6.0.1
 numpy>=1.24.0
+pandas>=2.0.0
 bm25s>=0.2.0
 faiss-cpu>=1.8.0
 sentence-transformers>=2.7.0
