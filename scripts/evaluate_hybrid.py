@@ -19,6 +19,7 @@ from retrieval.bm25_retriever import load_bm25_index
 from retrieval.config import load_retrieval_config
 from retrieval.corpus import load_corpus_from_config
 from retrieval.dense_retriever import load_dense_index, load_encoder_from_config
+from retrieval.evaluation import BenchmarkMetadata, benchmark_metadata, load_matching_metrics
 from retrieval.hybrid_retriever import HybridRetriever, rrf_fuse
 from retrieval.metrics import aggregate_dev_metrics
 from retrieval.router import route_query
@@ -35,6 +36,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate routed hybrid RRF on the development set.")
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--dev-set", type=Path, default=None)
+    parser.add_argument("--bm25-eval-dir", type=Path, default=None)
+    parser.add_argument("--dense-eval-dir", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--report-ks", nargs="+", type=int, default=None)
@@ -68,9 +71,15 @@ def hits_from_dicts(rows: list[dict]) -> list[SearchResult]:
     ]
 
 
-def render_report(metrics: dict, report_ks: list[int], top_k: int, comparisons: dict[str, dict]) -> str:
+def render_report(
+    metrics: dict,
+    report_ks: list[int],
+    top_k: int,
+    comparisons: dict[str, dict],
+    benchmark: BenchmarkMetadata,
+) -> str:
     lines = [
-        "# Hybrid RRF development evaluation",
+        f"# Hybrid RRF {benchmark.label} evaluation",
         "",
         f"- queries: {metrics['routed']['n']}",
         f"- top_k: {top_k}",
@@ -98,7 +107,7 @@ def render_report(metrics: dict, report_ks: list[int], top_k: int, comparisons: 
         "",
         yaml.safe_dump(metrics["oracle"]["metrics"], sort_keys=False).strip(),
         "",
-        "## Comparison (same 20 queries, same router)",
+        f"## Comparison ({benchmark.comparison_label})",
         "",
         "| metric | BM25 | Dense | Hybrid |",
         "| --- | --- | --- | --- |",
@@ -110,6 +119,8 @@ def render_report(metrics: dict, report_ks: list[int], top_k: int, comparisons: 
         [
             f"| TargetHit@5 | {bm25_m.get('TargetHit@5', '-')} | {dense_m.get('TargetHit@5', '-')} | {hybrid_m.get('TargetHit@5')} |",
             f"| TargetHit@10 | {bm25_m.get('TargetHit@10', '-')} | {dense_m.get('TargetHit@10', '-')} | {hybrid_m.get('TargetHit@10')} |",
+            f"| Recall@10 | {bm25_m.get('Recall@10', '-')} | {dense_m.get('Recall@10', '-')} | {hybrid_m.get('Recall@10')} |",
+            f"| nDCG@10 | {bm25_m.get('nDCG@10', '-')} | {dense_m.get('nDCG@10', '-')} | {hybrid_m.get('nDCG@10')} |",
             f"| MRR@10 | {bm25_m.get('MRR@10', '-')} | {dense_m.get('MRR@10', '-')} | {hybrid_m.get('MRR@10')} |",
             "",
             "## Offline RRF grid (candidates retrieved once)",
@@ -154,8 +165,9 @@ def main() -> int:
     )
 
     examples = list(load_jsonl(dev_set))
-    if len(examples) != 20:
-        raise ValueError(f"Expected 20 development queries, found {len(examples)}")
+    if not examples:
+        raise ValueError(f"Benchmark is empty: {dev_set}")
+    benchmark = benchmark_metadata(dev_set, query_count=len(examples))
 
     gold_ids = {
         item["chunk_id"]
@@ -263,11 +275,12 @@ def main() -> int:
 
     comparisons = {}
     for name, path in (
-        ("bm25", config.eval_output_dir / "metrics.json"),
-        ("dense", config.dense_eval_output_dir / "metrics.json"),
+        ("bm25", args.bm25_eval_dir or config.eval_output_dir),
+        ("dense", args.dense_eval_dir or config.dense_eval_output_dir),
     ):
-        if path.exists():
-            comparisons[name] = json.loads(path.read_text(encoding="utf-8"))
+        comparison_metrics = load_matching_metrics(path, dev_set, benchmark)
+        if comparison_metrics is not None:
+            comparisons[name] = comparison_metrics
 
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -285,10 +298,10 @@ def main() -> int:
         encoding="utf-8",
     )
     (output_dir / "report.md").write_text(
-        render_report(metrics, list(report_ks), top_k, comparisons),
+        render_report(metrics, list(report_ks), top_k, comparisons, benchmark),
         encoding="utf-8",
     )
-    (output_dir / "dev_set.sha256.txt").write_text(file_sha256(dev_set) + "\n", encoding="utf-8")
+    (output_dir / benchmark.hash_filename).write_text(file_sha256(dev_set) + "\n", encoding="utf-8")
 
     print(json.dumps(metrics["routed"]["metrics"], indent=2))
     print(f"Wrote evaluation -> {output_dir}")

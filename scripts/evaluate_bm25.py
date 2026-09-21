@@ -18,6 +18,7 @@ from chunking.utils import file_sha256, load_jsonl
 from retrieval.bm25_retriever import build_bm25_index, load_bm25_index, save_bm25_index
 from retrieval.config import load_retrieval_config
 from retrieval.corpus import load_corpus_from_config
+from retrieval.evaluation import BenchmarkMetadata, benchmark_metadata
 from retrieval.metrics import aggregate_dev_metrics
 from retrieval.router import route_query
 from retrieval.schema import SearchResult
@@ -47,9 +48,9 @@ def serialize_results(results: list[SearchResult]) -> list[dict]:
     ]
 
 
-def render_report(metrics: dict, report_ks: list[int], top_k: int) -> str:
+def render_report(metrics: dict, report_ks: list[int], top_k: int, benchmark: BenchmarkMetadata) -> str:
     lines = [
-        "# BM25 development evaluation",
+        f"# BM25 {benchmark.label} evaluation",
         "",
         f"- queries: {metrics['routed']['n']}",
         f"- top_k: {top_k}",
@@ -93,8 +94,9 @@ def main() -> int:
         index = load_bm25_index(index_dir, corpus.records)
 
     examples = list(load_jsonl(dev_set))
-    if len(examples) != 20:
-        raise ValueError(f"Expected 20 development queries, found {len(examples)}")
+    if not examples:
+        raise ValueError(f"Benchmark is empty: {dev_set}")
+    benchmark = benchmark_metadata(dev_set, query_count=len(examples))
 
     gold_ids = {
         item["chunk_id"]
@@ -161,8 +163,11 @@ def main() -> int:
         json.dumps(metrics, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    (output_dir / "report.md").write_text(render_report(metrics, list(report_ks), top_k), encoding="utf-8")
-    (output_dir / "dev_set.sha256.txt").write_text(file_sha256(dev_set) + "\n", encoding="utf-8")
+    (output_dir / "report.md").write_text(
+        render_report(metrics, list(report_ks), top_k, benchmark),
+        encoding="utf-8",
+    )
+    (output_dir / benchmark.hash_filename).write_text(file_sha256(dev_set) + "\n", encoding="utf-8")
 
     print(json.dumps(metrics["routed"]["metrics"], indent=2))
     print(f"Wrote evaluation -> {output_dir}")

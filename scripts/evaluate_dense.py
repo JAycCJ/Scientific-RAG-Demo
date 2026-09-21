@@ -18,6 +18,7 @@ from chunking.utils import file_sha256, load_jsonl
 from retrieval.config import load_retrieval_config
 from retrieval.corpus import load_corpus_from_config
 from retrieval.dense_retriever import load_dense_index, load_encoder_from_config
+from retrieval.evaluation import BenchmarkMetadata, benchmark_metadata, load_matching_metrics
 from retrieval.metrics import aggregate_dev_metrics
 from retrieval.router import route_query
 from retrieval.schema import SearchResult
@@ -28,6 +29,7 @@ def parse_args():
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--index-dir", type=Path, default=None)
     parser.add_argument("--dev-set", type=Path, default=None)
+    parser.add_argument("--bm25-eval-dir", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--report-ks", nargs="+", type=int, default=None)
@@ -51,9 +53,11 @@ def render_report(
     report_ks: list[int],
     top_k: int,
     bm25_metrics: dict | None = None,
+    benchmark: BenchmarkMetadata | None = None,
 ) -> str:
+    benchmark = benchmark or benchmark_metadata(Path("retrieval_dev.jsonl"), metrics["routed"]["n"])
     lines = [
-        "# Dense development evaluation",
+        f"# Dense {benchmark.label} evaluation",
         "",
         f"- queries: {metrics['routed']['n']}",
         f"- top_k: {top_k}",
@@ -84,12 +88,14 @@ def render_report(
         bm25_routed = bm25_metrics["routed"]["metrics"]
         lines.extend(
             [
-                "## Comparison with BM25 (same 20 queries, same router)",
+                f"## Comparison with BM25 ({benchmark.comparison_label})",
                 "",
                 "| metric | BM25 | Dense |",
                 "| --- | --- | --- |",
                 f"| TargetHit@5 | {bm25_routed.get('TargetHit@5')} | {dense_routed.get('TargetHit@5')} |",
                 f"| TargetHit@10 | {bm25_routed.get('TargetHit@10')} | {dense_routed.get('TargetHit@10')} |",
+                f"| Recall@10 | {bm25_routed.get('Recall@10')} | {dense_routed.get('Recall@10')} |",
+                f"| nDCG@10 | {bm25_routed.get('nDCG@10')} | {dense_routed.get('nDCG@10')} |",
                 f"| MRR@10 | {bm25_routed.get('MRR@10')} | {dense_routed.get('MRR@10')} |",
                 "",
                 "Dense embeds `content` only and does not pin identifier exact matches. "
@@ -119,8 +125,9 @@ def main() -> int:
     index = load_dense_index(index_dir, corpus.records, encoder)
 
     examples = list(load_jsonl(dev_set))
-    if len(examples) != 20:
-        raise ValueError(f"Expected 20 development queries, found {len(examples)}")
+    if not examples:
+        raise ValueError(f"Benchmark is empty: {dev_set}")
+    benchmark = benchmark_metadata(dev_set, query_count=len(examples))
 
     gold_ids = {
         item["chunk_id"]
@@ -188,15 +195,22 @@ def main() -> int:
         json.dumps(metrics, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    bm25_metrics_path = config.eval_output_dir / "metrics.json"
-    bm25_metrics = None
-    if bm25_metrics_path.exists():
-        bm25_metrics = json.loads(bm25_metrics_path.read_text(encoding="utf-8"))
+    bm25_metrics = load_matching_metrics(
+        args.bm25_eval_dir or config.eval_output_dir,
+        dev_set,
+        benchmark,
+    )
     (output_dir / "report.md").write_text(
-        render_report(metrics, list(report_ks), top_k, bm25_metrics=bm25_metrics),
+        render_report(
+            metrics,
+            list(report_ks),
+            top_k,
+            bm25_metrics=bm25_metrics,
+            benchmark=benchmark,
+        ),
         encoding="utf-8",
     )
-    (output_dir / "dev_set.sha256.txt").write_text(file_sha256(dev_set) + "\n", encoding="utf-8")
+    (output_dir / benchmark.hash_filename).write_text(file_sha256(dev_set) + "\n", encoding="utf-8")
 
     print(json.dumps(metrics["routed"]["metrics"], indent=2))
     print(f"Wrote evaluation -> {output_dir}")

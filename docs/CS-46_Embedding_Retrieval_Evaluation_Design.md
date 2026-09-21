@@ -1,8 +1,8 @@
 # CS-46 Embedding and Retrieval Evaluation Design
 
 **Project:** Evidence-Grounded Scientific RAG Assistant with Citation and Quality Evaluation for Drug Discovery
-**Document version:** v1.0
-**Date:** 2026-09-16
+**Document version:** v1.1
+**Date:** 2026-09-21
 **Scope:** Sparse, dense, and hybrid retrieval over normalized chunks; retrieval-only evaluation
 
 ---
@@ -279,7 +279,7 @@ The test set must not be inspected to tune retrieval parameters.
 
 | Query type | Count | Primary target |
 |---|---:|---|
-| Gene function, alias, or database identifier | 25 | `gene_info` |
+| Gene function, alias, identifier, or genomic location | 25 | `gene_info` |
 | LDSC trait correlation | 20 | `ldsc_genetic_correlation` |
 | Common-variant gene association | 20 | `gene_association_common` |
 | Rare-variant gene association | 15 | `gene_association_rare` |
@@ -322,7 +322,13 @@ Relevance grades:
 
 - `2`: directly answers the retrieval need
 - `1`: useful supporting evidence but not sufficient alone
-- `0`: not relevant; omitted from `relevance_judgments` but retained in `assessed_chunk_ids`
+- `0`: reviewed but not relevant
+
+For the finalized pooled benchmark, every reviewed candidate is recorded in
+`relevance_judgments` with an explicit grade of `0`, `1`, or `2`. The same
+candidate IDs are retained in `assessed_chunk_ids` to record the full reviewed
+pool. Therefore, grade `0` means explicitly judged non-relevant; an absent
+candidate is not treated as an automatically judged negative.
 
 Binary Recall and MRR treat grade `2` as relevant. nDCG uses grades `0–2`.
 
@@ -407,6 +413,20 @@ Report on the same machine and process settings:
 - end-to-end query latency, including query embedding
 - median, p95, and mean latency
 
+The current final test reruns recorded the following retrieval latency and
+serialized index sizes:
+
+| Method | Mean latency (s) | Median latency (s) | P95 latency (s) | Serialized index size |
+|---|---:|---:|---:|---:|
+| BM25 | 0.0409 | 0.0334 | 0.0993 | 33.61 MiB |
+| Dense | 0.1596 | 0.1361 | 0.1579 | 163.85 MiB |
+| Hybrid | 0.2214 | 0.1954 | 0.2807 | 197.46 MiB (BM25 + dense) |
+
+Document encoding time, index build time, cold-start load time, and separately
+isolated search-only versus end-to-end latency were not recorded in these
+runs. The detailed machine-readable summary is stored at
+`artifacts/evaluation/performance/performance_summary.json`.
+
 Run one warm-up pass, then at least five measured passes over the full query set. Report CPU/GPU model, RAM/VRAM, thread count, software versions, batch size, and whether caches are warm.
 
 ---
@@ -438,6 +458,83 @@ Run one warm-up pass, then at least five measured passes over the full query set
 - Dense timing is reported both with and without query encoding.
 - Hybrid timing includes both component searches and fusion.
 - A changed chunk file or model revision requires index rebuild and a new experiment identifier.
+
+### 10.2 Final 100-Query Test Results
+
+The finalized test benchmark contains 100 unique queries. The three methods
+were evaluated with the same benchmark snapshot and the same top-k values.
+The benchmark hash is:
+
+```text
+SHA-256: dd418debec143c33233db4c2a5b1986274ff72cbbf84574e34c3e7dc370b1f1f
+```
+
+The current benchmark contains 90 answerable and 10 unanswerable queries. Its
+difficulty distribution is 31 easy, 43 medium, and 26 hard queries. The
+relevance labels contain 100 grade-2 judgments and no grade-1 judgments in
+the completed conservative annotation pass.
+
+All 10 unanswerable queries now contain the pooled candidates returned by the
+three retrievers in `assessed_chunk_ids`; these candidates are judged as
+grade 0, and none is assigned grade 2.
+
+| Method | TargetHit@10 | Recall@10 | nDCG@10 | MRR@10 |
+|---|---:|---:|---:|---:|
+| BM25 | 0.870 | 0.870 | **0.8445** | **0.8350** |
+| Dense | 0.820 | 0.780 | 0.7137 | 0.7169 |
+| Hybrid (RRF) | **0.880** | **0.880** | 0.8272 | 0.8195 |
+
+The final result indicates that hybrid retrieval provides the strongest
+top-10 recall, while BM25 provides the strongest ranking quality according to
+nDCG@10 and MRR@10. Dense retrieval alone is lower on all four reported
+metrics for this benchmark. These results are retrieval-only results and do
+not evaluate answer generation or citation correctness.
+
+The completed first-pass manual audit covered all 100 benchmark queries. Each
+query was checked against its target chunk and retrieved candidates; the audit
+decisions are recorded in
+`data/evaluation/manual_review_decisions.jsonl`. The final benchmark uses a
+conservative 0/2 annotation: no candidate required a grade-1 partial-
+relevance label.
+
+The final outputs are stored in:
+
+- `artifacts/evaluation/bm25_test/`
+- `artifacts/evaluation/dense_test/`
+- `artifacts/evaluation/hybrid_test/`
+
+Each directory contains results for all 100 queries and records the same
+test-set SHA-256 and corpus chunk hashes.
+
+### 10.3 Sliced Findings
+
+The evaluator also reports results by query type. The most relevant Recall@10
+and nDCG@10 results are:
+
+| Query type | BM25 Recall@10 | Dense Recall@10 | Hybrid Recall@10 | BM25 nDCG@10 | Dense nDCG@10 | Hybrid nDCG@10 |
+|---|---:|---:|---:|---:|---:|---:|
+| Common association | 1.000 | 0.950 | 0.950 | 0.9678 | 0.8908 | 0.9500 |
+| Cross-collection | 1.000 | 0.500 | 1.000 | 0.9571 | 0.5169 | 0.9265 |
+| Gene alias | 1.000 | 0.833 | 1.000 | 1.0000 | 0.7718 | 1.0000 |
+| Gene function | 1.000 | 1.000 | 1.000 | 1.0000 | 0.9421 | 1.0000 |
+| Gene identifier | 1.000 | 0.500 | 1.000 | 1.0000 | 0.5000 | 1.0000 |
+| Gene location | 1.000 | 0.500 | 1.000 | 1.0000 | 0.5000 | 0.8155 |
+| LDSC correlation | 0.900 | 0.900 | 1.000 | 0.8262 | 0.6996 | 0.7911 |
+| Rare association | 0.933 | 0.933 | 0.933 | 0.9333 | 0.9087 | 0.9333 |
+
+The main error-analysis priorities are cross-collection retrieval, LDSC
+correlation, gene identifier, and gene location queries. Hybrid recovers all
+judged targets at top-10 for these categories, but its nDCG is lower than BM25
+on cross-collection queries, indicating that some relevant chunks are
+retrieved later in the ranking. Dense retrieval is particularly weaker on
+cross-collection, identifier, and location queries. The router itself achieved
+0.97 exact-set accuracy, 0.9783 collection precision, and 1.00 collection
+recall on this test run.
+
+Unanswerable queries are currently reported under forced retrieval. Their zero
+retrieval-quality scores do not measure abstention quality; a calibrated
+confidence threshold is still required before false-positive rate and coverage
+can be reported.
 
 ---
 
@@ -568,3 +665,4 @@ These extensions must not be added silently to the MVP baseline.
 | Version | Date | Notes |
 |---|---|---|
 | v1.0 | 2026-09-16 | Initial sparse, dense, hybrid retrieval and retrieval-only evaluation design |
+| v1.1 | 2026-09-21 | Added the finalized 100-query benchmark, manual-audit records, graded judgments, final retrieval results, latency percentiles, and serialized index-size summary |
