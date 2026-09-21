@@ -1,7 +1,7 @@
 # CS-46 Embedding and Retrieval Evaluation Design
 
 **Project:** Evidence-Grounded Scientific RAG Assistant with Citation and Quality Evaluation for Drug Discovery
-**Document version:** v1.3
+**Document version:** v1.1
 **Date:** 2026-09-21
 **Scope:** Sparse, dense, and hybrid retrieval over normalized chunks; retrieval-only evaluation
 
@@ -344,11 +344,6 @@ Binary Recall and MRR treat grade `2` as relevant. nDCG uses grades `0–2`.
 8. Freeze the completed judgments and test file, then record the file's SHA-256 hash before final experiments.
 
 Queries must not claim evidence absent from the chunk. LDSC, common-variant, rare-variant, and gene-function evidence remain semantically distinct.
-
-In the current finalized benchmark, every pooled candidate is retained in
-`relevance_judgments` with an explicit grade of `0`, `1`, or `2`. This makes
-the reviewed candidate set directly auditable and allows the evaluator to use
-the same file for binary Recall/MRR and graded nDCG calculations.
 
 If pooled judging is not completed, report `TargetHit@k` and target reciprocal rank instead of claiming corpus-level Recall or nDCG.
 
