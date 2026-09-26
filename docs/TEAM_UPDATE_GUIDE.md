@@ -43,7 +43,7 @@ tests, phase reports, and a no-API demonstration.
 ## Current verified results
 
 - Remote baseline: 35 automated tests passed.
-- Updated local version: 48 automated tests passed.
+- Updated local version: 55 automated tests passed.
 - Answerable BM25 TargetHit@10: 87/90 (96.67%).
 - End-to-end answer/refusal status accuracy: 99%.
 - Unanswerable refusal accuracy: 10/10.
@@ -97,7 +97,8 @@ as newly reproduced results.
 - Tissue and cell evidence are not dedicated corpus collections.
 - Collection filtering is simulated; it is not production authentication.
 - Source release/version metadata are incomplete for some records.
-- REST API, browser UI, Docker, CI, and hosted LLM integration are pending.
+- AIHubMix generation is available as an experimental provider with offline fallback.
+- REST API, browser UI, Docker, CI, and broad hosted-model evaluation are pending.
 
 ## Next work by priority
 

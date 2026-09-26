@@ -51,12 +51,13 @@ benchmark reproduction with recorded hardware and model revision.
 
 ## Generation roadmap
 
-First improve deterministic templates for identifiers, locations, comparisons,
-summaries, conflicting evidence, limitations, and evidence gaps. Then implement
-an approved provider adapter that returns the existing structured schema,
-requires claim citations, uses provider-specific token counting, supports
-timeouts and one controlled repair attempt, and falls back to the offline
-provider. Hosted-provider results must be evaluated independently.
+An experimental AIHubMix adapter now returns the existing structured schema,
+requires claim citations, supports a controlled JSON repair attempt, and falls
+back to the offline provider. A live TCF7L2 smoke test passed on 2026-09-27 with
+validated citations, no fallback, and approximately 20.44 s end-to-end latency.
+The next work is separate hosted-provider evaluation, provider-specific token
+counting, and improved deterministic templates for identifiers, locations,
+comparisons, summaries, conflicting evidence, limitations, and evidence gaps.
 
 ## Platform roadmap
 

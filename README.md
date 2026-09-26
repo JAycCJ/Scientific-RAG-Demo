@@ -56,7 +56,7 @@ python scripts/evaluate_rag_offline.py
 
 Current local verification:
 
-- 48 automated tests pass;
+- 55 automated tests pass;
 - answerable BM25 TargetHit@10: 87/90 (96.67%);
 - answer/refuse status accuracy: 99%;
 - unanswerable refusal accuracy: 10/10;
@@ -86,10 +86,48 @@ The configured embedding model is `Qwen/Qwen3-Embedding-0.6B`. Building its
 index can take a long time on a CPU or Apple laptop. Downloaded models and
 generated indexes are intentionally excluded from Git.
 
+## Optional AIHubMix generation
+
+The default provider remains offline. To enable the experimental hosted
+generator with automatic offline fallback:
+
+```bash
+python -m pip install -r requirements-llm.txt
+cp .env.example .env
+```
+
+Insert a newly generated key into the local `.env` file:
+
+```env
+AIHUBMIX_API_KEY=replace-with-a-new-key
+AIHUBMIX_BASE_URL=https://aihubmix.com/v1
+AIHUBMIX_MODEL=nemotron-3-ultra-550b-a55b-free
+```
+
+Run one grounded query:
+
+```bash
+python scripts/query_rag.py \
+  "What is the function of TCF7L2?" \
+  --provider aihubmix
+```
+
+The provider receives only the selected `ContextPackage`, must return
+claim-level citations as structured JSON, and falls back to the deterministic
+offline generator if the API fails or the output fails citation validation.
+Replace a key later by changing only `AIHUBMIX_API_KEY` in `.env` and restarting
+the command. Never commit `.env` or use a key that has been shared publicly.
+
+The first live smoke test completed successfully on 2026-09-27 using a TCF7L2
+function query: the hosted provider returned a cited answer, validation passed,
+no offline fallback was used, and end-to-end latency was approximately 20.44 s.
+
 ## Repository guide
 
 - Team update and file map: [`docs/TEAM_UPDATE_GUIDE.md`](docs/TEAM_UPDATE_GUIDE.md)
 - Project status and roadmap: [`docs/PROJECT_STATUS_AND_ROADMAP.md`](docs/PROJECT_STATUS_AND_ROADMAP.md)
+- Jira update guide: [`docs/JIRA_SUBTASK_UPDATE.md`](docs/JIRA_SUBTASK_UPDATE.md)
+- Prioritised remaining work: [`docs/TODO.md`](docs/TODO.md)
 - Stage reports: [`reports/`](reports/)
 - Retrieval configuration: [`config/retrieval.yaml`](config/retrieval.yaml)
 - Generation configuration: [`config/generation.yaml`](config/generation.yaml)

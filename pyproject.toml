@@ -21,6 +21,7 @@ embed = [
   "sentence-transformers>=2.7.0",
   "torch>=2.1.0",
 ]
+llm = ["openai>=3.19.2", "python-dotenv>=1.2.3"]
 test = ["faiss-cpu>=1.8.0", "pytest>=8.0"]
 
 [tool.setuptools.packages.find]
