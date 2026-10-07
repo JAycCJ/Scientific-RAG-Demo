@@ -16,8 +16,10 @@ See [`DEMO_GUIDE.md`](DEMO_GUIDE.md) for operating-system instructions,
 recommended questions, architecture, limitations, and troubleshooting.
 
 Offline mode is the reliable default and requires no API key. AIHubMix is
-optional; credentials belong only in a local `.env` copied from `.env.example`.
-Never commit `.env`.
+optional. For the browser demo, paste a key into the password field after
+selecting **AIHubMix**; it is kept only for the current app session. Command-line
+use can read a key from a local `.env`. See [`API_KEY_GUIDE.md`](API_KEY_GUIDE.md).
+Never commit `.env` or a real key.
 
 This repository contains a reproducible offline RAG baseline for the approved
 drug-discovery corpus. It covers corpus chunking, BM25/dense/hybrid retrieval,
@@ -75,7 +77,7 @@ python scripts/evaluate_rag_offline.py
 
 Current local verification:
 
-- 55 automated tests pass;
+- 60 automated tests pass;
 - answerable BM25 TargetHit@10: 87/90 (96.67%);
 - answer/refuse status accuracy: 99%;
 - unanswerable refusal accuracy: 10/10;
@@ -107,8 +109,9 @@ generated indexes are intentionally excluded from Git.
 
 ## Optional AIHubMix generation
 
-The default provider remains offline. To enable the experimental hosted
-generator with automatic offline fallback:
+The default provider remains offline. The browser demo accepts an AIHubMix key
+directly in its password field and does not save it. For command-line use,
+install the hosted-generator requirements and create a local `.env`:
 
 ```bash
 python -m pip install -r requirements-llm.txt
@@ -133,9 +136,13 @@ python scripts/query_rag.py \
 
 The provider receives only the selected `ContextPackage`, must return
 claim-level citations as structured JSON, and falls back to the deterministic
-offline generator if the API fails or the output fails citation validation.
+offline generator in the command-line pipeline if the API fails or the output
+fails citation validation. The browser reports hosted-provider errors directly
+so a failed API call cannot be mistaken for a successful online answer.
 Replace a key later by changing only `AIHUBMIX_API_KEY` in `.env` and restarting
 the command. Never commit `.env` or use a key that has been shared publicly.
+Full browser and command-line instructions are in
+[`API_KEY_GUIDE.md`](API_KEY_GUIDE.md).
 
 The first live smoke test completed successfully on 2026-09-27 using a TCF7L2
 function query: the hosted provider returned a cited answer, validation passed,

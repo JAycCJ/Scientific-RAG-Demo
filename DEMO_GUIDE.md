@@ -49,9 +49,16 @@ Leave the terminal window open while presenting. Press `Ctrl+C` in that terminal
 
 ## Optional AIHubMix mode
 
-Offline mode is recommended for a reliable demonstration. To try AIHubMix, copy `.env.example` to `.env`, add your own key, restart the application, and select **AIHubMix** in the page. Never commit or share `.env`.
+Offline mode is recommended for a reliable demonstration. To try AIHubMix in
+the browser, select **AIHubMix**, paste the key into the password field, and
+click **Generate answer**. The key stays only in the current local app session;
+it is not written to `.env` or GitHub. See [`API_KEY_GUIDE.md`](API_KEY_GUIDE.md)
+for browser and command-line instructions.
 
-AIHubMix is an external service. Availability, free-model behaviour, latency, and quotas are outside this project's control. The UI reports when offline fallback was used.
+AIHubMix is an external service. Availability, free-model behaviour, latency,
+and quotas are outside this project's control. The UI reports API, format, and
+quota errors directly. A valid key cannot generate an online answer after its
+account quota is exhausted.
 
 ## How the pipeline works
 
@@ -64,7 +71,7 @@ AIHubMix is an external service. Availability, free-model behaviour, latency, an
 ## Current status and limitations
 
 - 41,103 indexed chunks
-- 55 automated tests passing before demo packaging
+- 60 automated tests passing
 - BM25 TargetHit@10: 96.67% on the current evaluation set
 - Offline and optional AIHubMix generation
 - Claim-linked citations, refusal handling, validation, fallback, and latency reporting
@@ -76,5 +83,5 @@ These figures measure the current corpus and test set. They do not prove perfect
 - **`python` not found:** install Python 3.10+ and select the installer option that adds Python to PATH. On Windows, try `py` instead.
 - **Page does not open:** keep `run_demo.py` running and visit <http://localhost:8501>.
 - **Index or dependency error:** rerun `python setup_demo.py --rebuild`.
-- **AIHubMix falls back to offline:** use Offline mode for the demo, or check the model, quota, network, and `.env` key.
+- **AIHubMix fails:** check the key, model access, account quota, and network. Use Offline mode if the external service is unavailable.
 - **Port 8501 is already in use:** close the older Streamlit terminal, then run `python run_demo.py` again.

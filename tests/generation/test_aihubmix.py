@@ -18,9 +18,11 @@ class FakeCompletions:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = 0
+        self.requests = []
 
     def create(self, **kwargs):
         self.calls += 1
+        self.requests.append(kwargs)
         value = self.responses.pop(0)
         if isinstance(value, Exception):
             raise value
@@ -77,6 +79,7 @@ def test_aihubmix_returns_structured_cited_answer() -> None:
     assert answer.citations[0]["chunk_id"] == "gene:TCF7L2"
     assert validate_answer(answer, context).valid
     assert fake.completions.calls == 1
+    assert fake.completions.requests[0]["response_format"] == {"type": "json_object"}
 
 
 def test_aihubmix_accepts_json_code_fence() -> None:
@@ -86,6 +89,22 @@ def test_aihubmix_accepts_json_code_fence() -> None:
         api_key="test-key", client=fake, repair_attempts=0
     ).generate(context)
     assert answer.status == "answer"
+
+
+def test_aihubmix_extracts_json_after_reasoning_text() -> None:
+    context = context_for()
+    response = (
+        "<think>I should use only the supplied evidence.</think>\n"
+        "Here is the requested structured response:\n"
+        f"{payload()}\n"
+    )
+
+    answer = AIHubMixGenerator(
+        api_key="test-key", client=FakeClient([response]), repair_attempts=0
+    ).generate(context)
+
+    assert answer.provider == "aihubmix"
+    assert answer.claims[0].citations == ["gene:TCF7L2"]
 
 
 def test_aihubmix_does_not_call_api_for_refusal() -> None:
@@ -133,6 +152,22 @@ def test_invalid_json_raises_after_repair_budget() -> None:
     )
     with pytest.raises(AIHubMixGenerationError):
         generator.generate(context)
+
+
+def test_free_trial_exhaustion_reports_quota_error_without_retry() -> None:
+    context = context_for()
+    message = (
+        "Sorry, to prevent abuse of free resources, accounts that have not been "
+        "recharged can only try 10 times. You can increase the free quota after "
+        "recharging; https://console.aihubmix.com/topup"
+    )
+    fake = FakeClient([message])
+    generator = AIHubMixGenerator(api_key="test-key", client=fake, repair_attempts=1)
+
+    with pytest.raises(AIHubMixGenerationError, match="free-trial quota"):
+        generator.generate(context)
+
+    assert fake.completions.calls == 1
 
 
 def test_empty_key_is_rejected() -> None:
