@@ -1,5 +1,24 @@
 # CS-46 Evidence-Grounded Scientific RAG Assistant
 
+## Customer demonstration
+
+This repository includes a local browser demonstration for Windows and macOS.
+Python 3.10 or newer is the only prerequisite. From the repository folder run:
+
+```text
+python setup_demo.py
+python run_demo.py
+```
+
+Windows users can replace `python` with `py`. Setup creates an isolated virtual
+environment, installs the required packages, and builds the local BM25 index.
+See [`DEMO_GUIDE.md`](DEMO_GUIDE.md) for operating-system instructions,
+recommended questions, architecture, limitations, and troubleshooting.
+
+Offline mode is the reliable default and requires no API key. AIHubMix is
+optional; credentials belong only in a local `.env` copied from `.env.example`.
+Never commit `.env`.
+
 This repository contains a reproducible offline RAG baseline for the approved
 drug-discovery corpus. It covers corpus chunking, BM25/dense/hybrid retrieval,
 context augmentation, deterministic evidence-grounded generation, claim-linked
