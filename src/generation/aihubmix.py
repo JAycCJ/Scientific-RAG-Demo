@@ -12,6 +12,10 @@ class AIHubMixGenerationError(RuntimeError):
     """Raised when the hosted provider cannot return a valid grounded answer."""
 
 
+class _AIHubMixQuotaError(AIHubMixGenerationError):
+    """Raised when AIHubMix returns an account quota notice as model content."""
+
+
 def _json_content(content: str) -> dict[str, Any]:
     text = content.strip()
     if text.startswith("```"):
@@ -23,8 +27,25 @@ def _json_content(content: str) -> dict[str, Any]:
         text = "\n".join(lines).strip()
     try:
         value = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise AIHubMixGenerationError("provider returned invalid JSON") from exc
+    except json.JSONDecodeError:
+        # Some reasoning models prepend <think> blocks or explanatory text even
+        # when asked for JSON only. Extract the first object that matches the
+        # answer schema instead of rejecting an otherwise usable response.
+        decoder = json.JSONDecoder()
+        value = None
+        required_keys = {"status", "answer", "claims"}
+        for index, character in enumerate(text):
+            if character != "{":
+                continue
+            try:
+                candidate, _ = decoder.raw_decode(text[index:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(candidate, dict) and required_keys.issubset(candidate):
+                value = candidate
+                break
+        if value is None:
+            raise AIHubMixGenerationError("provider returned invalid JSON")
     if not isinstance(value, dict):
         raise AIHubMixGenerationError("provider response must be a JSON object")
     return value
@@ -151,11 +172,20 @@ class AIHubMixGenerator:
             model=self.model,
             messages=messages,
             max_tokens=self.max_tokens,
+            response_format={"type": "json_object"},
             stream=False,
         )
         content = response.choices[0].message.content
         if not isinstance(content, str) or not content.strip():
             raise AIHubMixGenerationError("provider returned empty content")
+        normalized = content.lower()
+        if "can only try 10 times" in normalized or (
+            "free" in normalized and "quota" in normalized and "topup" in normalized
+        ):
+            raise _AIHubMixQuotaError(
+                "AIHubMix free-trial quota is exhausted. Use a key from an account "
+                "with available quota or top up the current account."
+            )
         return content
 
     def generate(self, context: ContextPackage) -> GeneratedAnswer:
@@ -177,6 +207,8 @@ class AIHubMixGenerator:
             try:
                 content = self._request(messages)
                 return _parse_answer(_json_content(content), context, self.model)
+            except _AIHubMixQuotaError:
+                raise
             except (AIHubMixGenerationError, KeyError, IndexError, TypeError) as exc:
                 last_error = exc
                 if attempt >= self.repair_attempts:
@@ -186,7 +218,11 @@ class AIHubMixGenerator:
                     {"role": "assistant", "content": content if "content" in locals() else ""},
                     {
                         "role": "user",
-                        "content": "The response was invalid. Return only valid JSON matching the schema.",
+                        "content": (
+                            "The response was invalid. Return exactly one valid JSON object "
+                            "matching the schema. Do not include reasoning, <think> tags, "
+                            "Markdown fences, or any text before or after the JSON."
+                        ),
                     },
                 ]
             except Exception as exc:

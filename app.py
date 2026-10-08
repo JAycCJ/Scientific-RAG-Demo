@@ -13,7 +13,6 @@ if str(SRC_ROOT) not in sys.path:
 
 from augmentation.builder import ContextBuilder
 from generation.aihubmix import AIHubMixGenerator
-from generation.fallback import FallbackGenerator
 from generation.offline import OfflineEvidenceGenerator
 from rag.pipeline import RAGPipeline
 from retrieval.bm25_retriever import load_bm25_index
@@ -32,32 +31,30 @@ def load_environment() -> None:
 
 
 @st.cache_resource(show_spinner=False)
-def build_pipeline(provider: str) -> RAGPipeline:
+def load_retriever() -> RetrieverService:
     config = load_retrieval_config(PROJECT_ROOT)
     corpus = load_corpus_from_config(config)
     backend = load_bm25_index(config.index_dir, corpus.records)
-    offline = OfflineEvidenceGenerator()
+    return RetrieverService(backend, "bm25")
 
-    generator = offline
-    if provider == "AIHubMix":
-        api_key = os.environ.get("AIHUBMIX_API_KEY", "").strip()
-        if not api_key:
-            raise ValueError("未找到 AIHUBMIX_API_KEY。请把 Key 放入本地 .env 文件后重启页面。")
-        generator = FallbackGenerator(
-            primary=AIHubMixGenerator(
-                api_key=api_key,
-                base_url=os.environ.get("AIHUBMIX_BASE_URL", "https://aihubmix.com/v1"),
-                model=os.environ.get(
-                    "AIHUBMIX_MODEL", "nemotron-3-ultra-550b-a55b-free"
-                ),
-            ),
-            fallback=offline,
-        )
 
+def generator_for(provider: str, api_key: str):
+    if provider == "Offline":
+        return OfflineEvidenceGenerator()
+    if not api_key.strip():
+        raise ValueError("Please enter an AIHubMix API Key.")
+    return AIHubMixGenerator(
+        api_key=api_key.strip(),
+        base_url=os.environ.get("AIHUBMIX_BASE_URL", "https://aihubmix.com/v1"),
+        model=os.environ.get("AIHUBMIX_MODEL", "nemotron-3-ultra-550b-a55b-free"),
+    )
+
+
+def build_pipeline(provider: str, api_key: str = "") -> RAGPipeline:
     return RAGPipeline(
-        RetrieverService(backend, "bm25"),
+        load_retriever(),
         ContextBuilder(),
-        generator,
+        generator_for(provider, api_key),
     )
 
 
@@ -70,14 +67,14 @@ def show_result(run) -> None:
     else:
         st.success(answer.answer)
 
-    left, middle, right = st.columns(3)
+    model = answer.diagnostics.get("model")
+    columns = st.columns(4 if model else 3)
+    left, middle, right = columns[:3]
     left.metric("Status", answer.status)
     middle.metric("Provider", answer.provider)
     right.metric("Latency", f"{run.latency_s['total']:.2f}s")
-
-    fallback = answer.diagnostics.get("fallback_from")
-    if fallback:
-        st.warning(f"Online model failed; offline fallback was used (from: {fallback}).")
+    if model:
+        columns[3].metric("Model", model)
 
     st.subheader("Citations")
     if not answer.citations:
@@ -110,6 +107,15 @@ ask_tab, progress_tab, next_tab = st.tabs(["Ask", "Current Progress", "Next Step
 
 with ask_tab:
     provider = st.radio("Generator", ["Offline", "AIHubMix"], horizontal=True)
+    api_key = ""
+    if provider == "AIHubMix":
+        api_key = st.text_input(
+            "AIHubMix API Key",
+            type="password",
+            placeholder="sk-...",
+            help="Kept only in this local app session and never written to disk.",
+        )
+        st.caption("The key is used only for this request and is not saved to .env or GitHub.")
     question = st.text_area(
         "Question",
         value="What is the function of TCF7L2?",
@@ -118,25 +124,30 @@ with ask_tab:
     if st.button("Generate answer", type="primary"):
         if not question.strip():
             st.warning("Please enter a question.")
+        elif provider == "AIHubMix" and not api_key.strip():
+            st.warning("Please enter an AIHubMix API Key.")
         else:
             try:
                 with st.spinner("Retrieving evidence and generating the answer..."):
-                    run = build_pipeline(provider).run(
+                    run = build_pipeline(provider, api_key).run(
                         RetrievalRequest(
                             question.strip(),
                             authorized_collections=tuple(ALL_COLLECTIONS),
                             top_k=10,
                         )
                     )
+                if provider == "AIHubMix":
+                    st.success("AIHubMix connected successfully and generated this answer.")
                 show_result(run)
             except Exception as exc:
-                st.error(f"Unable to run the demo: {exc}")
+                prefix = "AIHubMix connection failed" if provider == "AIHubMix" else "Unable to run the demo"
+                st.error(f"{prefix}: {exc}")
 
 with progress_tab:
     st.subheader("Current MVP progress")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Corpus chunks", "41,103")
-    c2.metric("Automated tests", "55")
+    c2.metric("Automated tests", "60")
     c3.metric("BM25 TargetHit@10", "96.67%")
     c4.metric("Live LLM smoke test", "Passed")
     st.markdown(
